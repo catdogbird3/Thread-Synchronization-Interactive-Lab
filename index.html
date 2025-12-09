@@ -1,0 +1,964 @@
+<!doctype html>
+<html lang="zh-TW">
+ <head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Thread Synchronization 互動教學</title>
+  <script src="/_sdk/element_sdk.js"></script>
+  <style>
+        body {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', 'Microsoft JhengHei', sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            width: 100%;
+            height: 100%;
+        }
+
+        html {
+            height: 100%;
+        }
+
+        .app-container {
+            width: 100%;
+            min-height: 100%;
+            padding: 32px 24px;
+        }
+
+        .content-wrapper {
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+
+        h1 {
+            color: #ffffff;
+            text-align: center;
+            margin-bottom: 48px;
+            font-size: 42px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+
+        .demo-section {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 32px;
+            margin-bottom: 32px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        .demo-section h2 {
+            color: #667eea;
+            margin-top: 0;
+            margin-bottom: 24px;
+            font-size: 28px;
+            border-bottom: 3px solid #667eea;
+            padding-bottom: 12px;
+        }
+
+        .demo-section h3 {
+            color: #764ba2;
+            margin-top: 24px;
+            margin-bottom: 16px;
+            font-size: 22px;
+        }
+
+        .explanation {
+            background: #f8f9ff;
+            border-left: 4px solid #667eea;
+            padding: 16px;
+            margin: 16px 0;
+            border-radius: 4px;
+            line-height: 1.8;
+        }
+
+        .visualization {
+            display: flex;
+            gap: 24px;
+            margin: 24px 0;
+            flex-wrap: wrap;
+            align-items: flex-start;
+        }
+
+        .thread-box {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            padding: 20px;
+            border-radius: 12px;
+            text-align: center;
+            font-weight: 600;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+            transition: all 0.3s ease;
+        }
+
+        .thread-box.locked {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+            transform: scale(1.05);
+            box-shadow: 0 8px 20px rgba(17, 153, 142, 0.4);
+        }
+
+        .thread-box.working {
+            background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+            animation: working-pulse 0.8s ease-in-out;
+        }
+
+        @keyframes working-pulse {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.08); }
+        }
+
+        .counter-display {
+            background: #2d3748;
+            color: #ffffff;
+            padding: 24px;
+            border-radius: 12px;
+            text-align: center;
+            font-size: 36px;
+            font-weight: bold;
+            margin: 24px 0;
+            font-family: 'Courier New', monospace;
+        }
+
+        .control-panel {
+            display: flex;
+            gap: 16px;
+            margin: 24px 0;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .btn {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: #ffffff;
+            border: none;
+            padding: 14px 28px;
+            border-radius: 8px;
+            font-size: 16px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+        }
+
+        .btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 16px rgba(102, 126, 234, 0.4);
+        }
+
+        .btn:active:not(:disabled) {
+            transform: translateY(0);
+        }
+
+        .btn:disabled {
+            background: linear-gradient(135deg, #cbd5e0 0%, #a0aec0 100%);
+            cursor: not-allowed;
+            opacity: 0.5;
+        }
+
+        .btn-secondary {
+            background: linear-gradient(135deg, #fc466b 0%, #3f5efb 100%);
+        }
+
+        .btn-success {
+            background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
+        }
+
+        .code-example {
+            background: #2d3748;
+            color: #e2e8f0;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 16px 0;
+            font-family: 'Courier New', monospace;
+            font-size: 14px;
+            line-height: 1.6;
+        }
+
+        .code-keyword {
+            color: #fc6b6b;
+        }
+
+        .code-function {
+            color: #ffc947;
+        }
+
+        .code-comment {
+            color: #90cdf4;
+            font-style: italic;
+        }
+
+        .log-area {
+            background: #1a202c;
+            color: #e2e8f0;
+            padding: 16px;
+            border-radius: 8px;
+            max-height: 300px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 13px;
+            margin: 16px 0;
+        }
+
+        .log-entry {
+            margin: 4px 0;
+            padding: 4px 0;
+            border-bottom: 1px solid #2d3748;
+        }
+
+        .log-entry.success {
+            color: #68d391;
+        }
+
+        .log-entry.error {
+            color: #fc8181;
+        }
+
+        .log-entry.warning {
+            color: #f6ad55;
+        }
+
+        .highlight-box {
+            background: #e8f4fd;
+            border: 2px solid #2196f3;
+            border-radius: 8px;
+            padding: 20px;
+            margin: 24px 0;
+        }
+
+        .highlight-box h4 {
+            color: #1565c0;
+            margin-top: 0;
+            margin-bottom: 12px;
+        }
+
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 8px;
+        }
+
+        .status-indicator.active {
+            background: #48bb78;
+            box-shadow: 0 0 8px #48bb78;
+        }
+
+        .status-indicator.waiting {
+            background: #ed8936;
+            box-shadow: 0 0 8px #ed8936;
+        }
+
+        .status-indicator.idle {
+            background: #a0aec0;
+        }
+
+        .mutex-lock-container {
+            background: #ffffff;
+            border: 4px solid #cbd5e0;
+            border-radius: 16px;
+            padding: 24px;
+            text-align: center;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.15);
+            transition: all 0.4s ease;
+            min-width: 180px;
+        }
+
+        .mutex-lock-container.locked {
+            border-color: #fc466b;
+            background: #fff5f7;
+            box-shadow: 0 8px 24px rgba(252, 70, 107, 0.3);
+        }
+
+        .lock-icon {
+            font-size: 72px;
+            margin-bottom: 12px;
+            transition: transform 0.4s ease;
+        }
+
+        .mutex-lock-container.locked .lock-icon {
+            transform: scale(1.15) rotate(5deg);
+        }
+
+        .lock-status {
+            font-size: 20px;
+            font-weight: bold;
+            color: #2d3748;
+            margin-bottom: 8px;
+        }
+
+        .mutex-lock-container.locked .lock-status {
+            color: #c53030;
+        }
+
+        .lock-owner {
+            font-size: 15px;
+            color: #718096;
+            font-weight: 600;
+        }
+
+        .mutex-lock-container.locked .lock-owner {
+            color: #fc466b;
+        }
+
+        .mode-selector {
+            background: #fff3cd;
+            border: 2px solid #ffc107;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+        }
+
+        .comparison-table {
+            width: 100%;
+            border-collapse: collapse;
+            margin: 24px 0;
+            background: #ffffff;
+            overflow: hidden;
+            border-radius: 8px;
+            box-shadow: 0 2px 8px rgba(0,0,0,0.1);
+        }
+
+        .comparison-table th {
+            background: #667eea;
+            color: #ffffff;
+            padding: 16px;
+            text-align: left;
+            font-weight: 600;
+        }
+
+        .comparison-table td {
+            padding: 16px;
+            border-bottom: 1px solid #e0e0e0;
+        }
+
+        .comparison-table tr:last-child td {
+            border-bottom: none;
+        }
+
+        .comparison-table tr:nth-child(even) {
+            background: #f8f9ff;
+        }
+
+        .race-warning {
+            background: #fff5f5;
+            border: 3px solid #fc8181;
+            border-radius: 8px;
+            padding: 16px;
+            margin: 16px 0;
+            text-align: center;
+            font-weight: bold;
+            color: #c53030;
+            display: none;
+            animation: shake 0.5s ease;
+        }
+
+        @keyframes shake {
+            0%, 100% { transform: translateX(0); }
+            25% { transform: translateX(-10px); }
+            75% { transform: translateX(10px); }
+        }
+
+        .race-warning.show {
+            display: block;
+        }
+
+        .semaphore-counter {
+            display: flex;
+            justify-content: center;
+            gap: 12px;
+            margin: 24px 0;
+        }
+
+        .sem-slot {
+            width: 60px;
+            height: 60px;
+            border: 3px solid #667eea;
+            border-radius: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            font-weight: bold;
+            transition: all 0.3s ease;
+        }
+
+        .sem-slot.available {
+            background: #c6f6d5;
+            color: #22543d;
+        }
+
+        .sem-slot.taken {
+            background: #fed7d7;
+            color: #742a2a;
+        }
+    </style>
+  <style>@view-transition { navigation: auto; }</style>
+  <script src="/_sdk/data_sdk.js" type="text/javascript"></script>
+  <script src="https://cdn.tailwindcss.com" type="text/javascript"></script>
+ </head>
+ <body>
+  <div class="app-container">
+   <div class="content-wrapper">
+    <h1>Thread Synchronization 互動教學</h1><!-- Mutex Interactive Demo -->
+    <div class="demo-section">
+     <h2>🔒 Mutex 互動體驗：手動控制 Lock/Unlock</h2>
+     <div class="explanation"><strong>互動方式：</strong>你可以手動控制兩個執行緒的每個動作！<br><strong>使用 Mutex：</strong>體驗「誰 lock 誰才能 unlock」，其他執行緒必須等待。<br><strong>不使用 Mutex：</strong>兩個執行緒同時操作共享變數，會發生 Race Condition 導致計數錯誤！
+     </div>
+     <div class="highlight-box">
+      <h4>🔑 Mutex Lock/Unlock 關鍵重點</h4>
+      <ul style="line-height: 2; margin: 0;">
+       <li><strong>k_mutex_lock()</strong> - 嘗試「取得鎖」，如果已被佔用就<strong>無法執行</strong>（按鈕會被禁用）</li>
+       <li><strong>臨界區 (Critical Section)</strong> - 只有持有鎖的執行緒才能安全執行 counter++</li>
+       <li><strong>k_mutex_unlock()</strong> - 只有「持有者」才能釋放，其他執行緒的 unlock 按鈕會被禁用</li>
+       <li><strong>擁有權原則</strong> - 誰 lock 就必須誰 unlock（不能由其他執行緒代勞）</li>
+      </ul>
+     </div>
+     <div class="mode-selector"><strong style="font-size: 18px;">🎮 模式選擇：</strong>
+      <div style="display: flex; gap: 12px; margin-top: 12px;"><button class="btn btn-success" id="mode-with-mutex" onclick="setMode(true)" style="flex: 1;">✅ 使用 Mutex 保護</button> <button class="btn btn-secondary" id="mode-without-mutex" onclick="setMode(false)" style="flex: 1;">❌ 不使用 Mutex（體驗 Race Condition）</button>
+      </div>
+      <div id="current-mode" style="margin-top: 12px; text-align: center; font-weight: bold; font-size: 18px; color: #28a745;">
+       當前模式：✅ 使用 Mutex 保護
+      </div>
+     </div>
+     <div class="race-warning" id="race-warning">
+      ⚠️ Race Condition 發生！兩個執行緒同時讀取相同值，導致其中一次 +1 失效！
+     </div>
+     <div class="visualization">
+      <div style="flex: 1; min-width: 280px;">
+       <div class="thread-box" id="mutex-t1">
+        <div>
+         <span class="status-indicator idle" id="mutex-t1-status"></span>執行緒 1
+        </div>
+        <div id="mutex-t1-count" style="font-size: 20px; margin: 12px 0;">
+         個人計數: 0
+        </div>
+        <div id="mutex-t1-state" style="font-size: 14px; opacity: 0.9;">
+         狀態: Idle
+        </div>
+       </div>
+       <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 16px;"><button class="btn" id="t1-lock-btn" onclick="threadLock(1)" style="font-size: 15px; padding: 12px;">🔒 k_mutex_lock()</button> <button class="btn" id="t1-unlock-btn" onclick="threadUnlock(1)" style="font-size: 15px; padding: 12px;" disabled>🔓 k_mutex_unlock()</button> <button class="btn btn-success" id="t1-counter-btn" onclick="threadIncrement(1)" style="font-size: 15px; padding: 12px;">➕ counter++</button>
+       </div>
+      </div>
+      <div style="flex: 0 0 auto; display: flex; flex-direction: column; align-items: center; justify-content: center; min-width: 200px;">
+       <div id="mutex-lock-visual" class="mutex-lock-container">
+        <div class="lock-icon">
+         🔓
+        </div>
+        <div class="lock-status">
+         Unlocked
+        </div>
+        <div class="lock-owner">
+         無持有者
+        </div>
+       </div>
+      </div>
+      <div style="flex: 1; min-width: 280px;">
+       <div class="thread-box" id="mutex-t2">
+        <div>
+         <span class="status-indicator idle" id="mutex-t2-status"></span>執行緒 2
+        </div>
+        <div id="mutex-t2-count" style="font-size: 20px; margin: 12px 0;">
+         個人計數: 0
+        </div>
+        <div id="mutex-t2-state" style="font-size: 14px; opacity: 0.9;">
+         狀態: Idle
+        </div>
+       </div>
+       <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 16px;"><button class="btn" id="t2-lock-btn" onclick="threadLock(2)" style="font-size: 15px; padding: 12px;">🔒 k_mutex_lock()</button> <button class="btn" id="t2-unlock-btn" onclick="threadUnlock(2)" style="font-size: 15px; padding: 12px;" disabled>🔓 k_mutex_unlock()</button> <button class="btn btn-success" id="t2-counter-btn" onclick="threadIncrement(2)" style="font-size: 15px; padding: 12px;">➕ counter++</button>
+       </div>
+      </div>
+     </div>
+     <div class="counter-display" id="mutex-counter">
+      共享計數器 (Shared Counter): 0
+     </div>
+     <div class="control-panel"><button class="btn" onclick="resetMutexDemo()" style="font-size: 18px; padding: 16px 32px;">🔄 重置全部</button>
+     </div>
+     <div class="log-area" id="mutex-log"></div>
+     <h3>程式碼範例</h3>
+     <div class="code-example"><span class="code-keyword">static</span> <span class="code-keyword">volatile</span> uint32_t counter = 0; K_MUTEX_DEFINE(counter_lock); <span class="code-keyword">void</span> <span class="code-function">thread_function</span>() { <span class="code-comment">/* 步驟 1: 取得鎖 */</span> <span class="code-function">k_mutex_lock</span>(&amp;counter_lock, K_FOREVER); <span class="code-comment">/* 步驟 2: 臨界區 - 只有持有鎖的執行緒可以執行 */</span> counter++; <span class="code-comment">/* 步驟 3: 釋放鎖（必須由持有者釋放）*/</span> <span class="code-function">k_mutex_unlock</span>(&amp;counter_lock); }
+     </div>
+    </div><!-- Semaphore Event Demo -->
+    <div class="demo-section">
+     <h2>📡 Semaphore 示範 A：ISR → 執行緒通知</h2>
+     <div class="explanation"><strong>情境：</strong>模擬每秒的 Timer ISR 發出通知，工作執行緒收到後才處理取樣。<br><strong>重點：</strong><code>k_sem_give()</code> 可在 ISR 呼叫，而 Mutex 不行！
+     </div>
+     <div class="visualization">
+      <div class="thread-box" id="sem-isr">
+       <div>
+        ⏰ Timer ISR
+       </div>
+       <div id="sem-isr-status">
+        等待觸發...
+       </div>
+      </div>
+      <div class="thread-box" id="sem-worker">
+       <div>
+        <span class="status-indicator waiting" id="sem-worker-status"></span>工作執行緒
+       </div>
+       <div id="sem-worker-status-text">
+        等待通知...
+       </div>
+      </div>
+     </div>
+     <div class="counter-display" id="sem-event-counter">
+      已處理取樣: 0
+     </div>
+     <div class="control-panel"><button class="btn" id="sem-start-btn" onclick="startSemaphoreDemo()">▶️ 啟動 Timer</button> <button class="btn btn-secondary" id="sem-stop-btn" onclick="stopSemaphoreDemo()" disabled>⏸️ 停止 Timer</button> <button class="btn" id="sem-reset-btn" onclick="resetSemaphoreDemo()">🔄 重置</button>
+     </div>
+     <div class="log-area" id="sem-log"></div>
+     <h3>程式碼範例</h3>
+     <div class="code-example">
+      K_SEM_DEFINE(sample_sem, 0, 1); <span class="code-keyword">static void</span> <span class="code-function">timer_handler</span>() { <span class="code-comment">/* ISR context：只做發訊號 */</span> <span class="code-function">k_sem_give</span>(&amp;sample_sem); } <span class="code-keyword">void</span> <span class="code-function">worker</span>() { <span class="code-keyword">while</span> (1) { <span class="code-function">k_sem_take</span>(&amp;sample_sem, K_FOREVER); <span class="code-comment">/* 真正工作放在執行緒做 */</span> process_sampling(); } }
+     </div>
+    </div><!-- Semaphore Resource Pool Demo -->
+    <div class="demo-section">
+     <h2>🎯 Semaphore 示範 B：資源池（最多 3 個）</h2>
+     <div class="explanation"><strong>情境：</strong>系統同時最多允許 3 個 DMA buffer 被使用。<br><strong>第 4 個嘗試：</strong>會阻塞等待，直到有人釋放資源。
+     </div>
+     <div class="semaphore-counter" id="sem-slots">
+      <div class="sem-slot available">
+       1
+      </div>
+      <div class="sem-slot available">
+       2
+      </div>
+      <div class="sem-slot available">
+       3
+      </div>
+     </div>
+     <div class="counter-display" id="sem-pool-status">
+      可用資源: 3 / 3
+     </div>
+     <div class="control-panel"><button class="btn" onclick="acquireResource()">🔽 取得資源 (take)</button> <button class="btn btn-secondary" onclick="releaseResource()">🔼 釋放資源 (give)</button> <button class="btn" onclick="resetPoolDemo()">🔄 重置</button>
+     </div>
+     <div class="log-area" id="pool-log"></div>
+     <h3>程式碼範例</h3>
+     <div class="code-example"><span class="code-comment">/* 初始可用 3 個，最大 3 個 */</span> K_SEM_DEFINE(buf_sem, 3, 3); <span class="code-keyword">void</span> <span class="code-function">use_buffer</span>() { <span class="code-comment">/* 沒名額就等待 */</span> <span class="code-function">k_sem_take</span>(&amp;buf_sem, K_FOREVER); <span class="code-comment">/* 使用 buffer ... */</span> do_work(); <span class="code-comment">/* 用完歸還名額 */</span> <span class="code-function">k_sem_give</span>(&amp;buf_sem); }
+     </div>
+    </div><!-- Comparison Table -->
+    <div class="demo-section">
+     <h2>📊 Semaphore vs Mutex 比較表</h2>
+     <table class="comparison-table">
+      <thead>
+       <tr>
+        <th>項目</th>
+        <th>Semaphore（訊號量）</th>
+        <th>Mutex（互斥鎖）</th>
+       </tr>
+      </thead>
+      <tbody>
+       <tr>
+        <td><strong>本質</strong></td>
+        <td>一個計數器（可設定最大值）</td>
+        <td>一把鎖（一次只能一個持有者）</td>
+       </tr>
+       <tr>
+        <td><strong>擁有權</strong></td>
+        <td>無擁有者：A take，B 也能 give</td>
+        <td>有擁有者：誰 lock 就必須誰 unlock</td>
+       </tr>
+       <tr>
+        <td><strong>主要用途</strong></td>
+        <td>1) 事件/通知<br>
+         2) 資源池管理</td>
+        <td>保護臨界區（同時僅一執行緒可進入）</td>
+       </tr>
+       <tr>
+        <td><strong>ISR 使用</strong></td>
+        <td>✅ k_sem_give() 可在 ISR 呼叫</td>
+        <td>❌ 不能在 ISR lock/unlock</td>
+       </tr>
+       <tr>
+        <td><strong>優先權反轉</strong></td>
+        <td>沒有內建處理機制</td>
+        <td>✅ Zephyr 具優先權繼承</td>
+       </tr>
+       <tr>
+        <td><strong>Race Condition</strong></td>
+        <td>無法防止（設計目的不同）</td>
+        <td>✅ 可防止多執行緒同時存取共享資源</td>
+       </tr>
+      </tbody>
+     </table>
+     <div class="highlight-box" style="background: #fff5e6; border-color: #ffa726;">
+      <h4 style="color: #e65100;">🎯 選擇決策</h4>
+      <ul style="line-height: 2; margin: 0;">
+       <li><strong>保護共享資料的臨界區</strong> → 用 <strong>Mutex</strong></li>
+       <li><strong>ISR/裝置 → 執行緒的喚醒/通知</strong> → 用 <strong>Semaphore</strong></li>
+       <li><strong>固定數量資源池</strong> → 用 <strong>Counting Semaphore</strong></li>
+       <li><strong>千萬別</strong>在 ISR 用 mutex；也不要用 semaphore 當互斥鎖</li>
+      </ul>
+     </div>
+    </div>
+   </div>
+  </div>
+  <script>
+        // Mutex Demo State
+        let useMutex = true;
+        let mutexLocked = false;
+        let mutexOwner = null;
+        let sharedCounter = 0;
+        let thread1Count = 0;
+        let thread2Count = 0;
+        let thread1Reading = null;
+        let thread2Reading = null;
+
+        // Semaphore Event Demo State
+        let semEventCounter = 0;
+        let semTimer = null;
+        let semRunning = false;
+
+        // Semaphore Pool Demo State
+        let poolAvailable = 3;
+        const MAX_RESOURCES = 3;
+
+        function addLog(message, type = 'normal') {
+            const logArea = document.getElementById('mutex-log');
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            if (type === 'success') entry.classList.add('success');
+            if (type === 'error') entry.classList.add('error');
+            if (type === 'warning') entry.classList.add('warning');
+            
+            const timestamp = new Date().toLocaleTimeString('zh-TW');
+            entry.textContent = `[${timestamp}] ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function addSemLog(logId, message) {
+            const logArea = document.getElementById(logId);
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            const timestamp = new Date().toLocaleTimeString('zh-TW');
+            entry.textContent = `[${timestamp}] ${message}`;
+            logArea.appendChild(entry);
+            logArea.scrollTop = logArea.scrollHeight;
+        }
+
+        function updateLockVisual() {
+            const lockContainer = document.getElementById('mutex-lock-visual');
+            const lockIcon = lockContainer.querySelector('.lock-icon');
+            const lockStatus = lockContainer.querySelector('.lock-status');
+            const lockOwner = lockContainer.querySelector('.lock-owner');
+            
+            if (mutexLocked && mutexOwner) {
+                lockContainer.className = 'mutex-lock-container locked';
+                lockIcon.textContent = '🔒';
+                lockStatus.textContent = 'Locked';
+                lockOwner.textContent = `持有者: 執行緒 ${mutexOwner}`;
+            } else {
+                lockContainer.className = 'mutex-lock-container';
+                lockIcon.textContent = '🔓';
+                lockStatus.textContent = 'Unlocked';
+                lockOwner.textContent = '無持有者';
+            }
+        }
+
+        function updateThreadDisplay(threadNum) {
+            const count = threadNum === 1 ? thread1Count : thread2Count;
+            document.getElementById(`mutex-t${threadNum}-count`).textContent = `個人計數: ${count}`;
+            
+            const hasLock = mutexOwner === threadNum;
+            const box = document.getElementById(`mutex-t${threadNum}`);
+            const status = document.getElementById(`mutex-t${threadNum}-status`);
+            
+            if (hasLock) {
+                box.classList.add('locked');
+                status.className = 'status-indicator active';
+                document.getElementById(`mutex-t${threadNum}-state`).textContent = '狀態: 持有鎖';
+            } else {
+                box.classList.remove('locked');
+                status.className = 'status-indicator idle';
+                document.getElementById(`mutex-t${threadNum}-state`).textContent = '狀態: Idle';
+            }
+        }
+
+        function updateButtons() {
+            const t1HasLock = mutexOwner === 1;
+            const t2HasLock = mutexOwner === 2;
+            const anyLocked = mutexLocked;
+
+            if (useMutex) {
+                document.getElementById('t1-lock-btn').disabled = anyLocked;
+                document.getElementById('t1-unlock-btn').disabled = !t1HasLock;
+                document.getElementById('t1-counter-btn').disabled = false;
+
+                document.getElementById('t2-lock-btn').disabled = anyLocked;
+                document.getElementById('t2-unlock-btn').disabled = !t2HasLock;
+                document.getElementById('t2-counter-btn').disabled = false;
+            } else {
+                document.getElementById('t1-lock-btn').disabled = true;
+                document.getElementById('t1-unlock-btn').disabled = true;
+                document.getElementById('t1-counter-btn').disabled = false;
+                
+                document.getElementById('t2-lock-btn').disabled = true;
+                document.getElementById('t2-unlock-btn').disabled = true;
+                document.getElementById('t2-counter-btn').disabled = false;
+            }
+        }
+
+        function setMode(withMutex) {
+            useMutex = withMutex;
+            resetMutexDemo();
+            
+            const modeText = document.getElementById('current-mode');
+            if (withMutex) {
+                modeText.textContent = '當前模式：✅ 使用 Mutex 保護';
+                modeText.style.color = '#28a745';
+                addLog('模式切換：✅ 使用 Mutex 保護模式', 'success');
+            } else {
+                modeText.textContent = '當前模式：❌ 不使用 Mutex（會發生 Race Condition）';
+                modeText.style.color = '#dc3545';
+                addLog('模式切換：❌ 不使用 Mutex - 準備體驗 Race Condition！', 'warning');
+                addLog('提示：在此模式下，兩個執行緒可能同時讀取相同的 counter 值', 'warning');
+            }
+            
+            updateButtons();
+        }
+
+        function threadLock(threadNum) {
+            if (!useMutex) return;
+            
+            if (mutexLocked) {
+                addLog(`執行緒 ${threadNum}: k_mutex_lock() 失敗 ❌ - Mutex 已被執行緒 ${mutexOwner} 持有`, 'error');
+                return;
+            }
+
+            mutexLocked = true;
+            mutexOwner = threadNum;
+            addLog(`執行緒 ${threadNum}: k_mutex_lock() 成功 ✅ - 取得 Mutex 擁有權`, 'success');
+            
+            updateLockVisual();
+            updateThreadDisplay(threadNum);
+            updateButtons();
+        }
+
+        function threadUnlock(threadNum) {
+            if (!useMutex) return;
+            
+            if (mutexOwner !== threadNum) {
+                addLog(`執行緒 ${threadNum}: k_mutex_unlock() 失敗 ❌ - 只有持有者（執行緒 ${mutexOwner}）才能釋放`, 'error');
+                return;
+            }
+
+            mutexLocked = false;
+            mutexOwner = null;
+            addLog(`執行緒 ${threadNum}: k_mutex_unlock() 成功 ✅ - 釋放 Mutex`, 'success');
+            
+            updateLockVisual();
+            updateThreadDisplay(threadNum);
+            updateButtons();
+        }
+
+        function threadIncrement(threadNum) {
+            if (useMutex) {
+                if (mutexOwner !== threadNum) {
+                    addLog(`執行緒 ${threadNum}: counter++ 失敗 ❌ - 未持有 Mutex，無法進入臨界區`, 'error');
+                    return;
+                }
+                
+                addLog(`執行緒 ${threadNum}: 【臨界區】讀取 counter = ${sharedCounter}`, 'success');
+                sharedCounter++;
+                if (threadNum === 1) thread1Count++;
+                else thread2Count++;
+                
+                addLog(`執行緒 ${threadNum}: 【臨界區】counter++ 完成，新值 = ${sharedCounter}`, 'success');
+                
+            } else {
+                const otherThread = threadNum === 1 ? 2 : 1;
+                const thisReading = threadNum === 1 ? 'thread1Reading' : 'thread2Reading';
+                const otherReading = threadNum === 1 ? 'thread2Reading' : 'thread1Reading';
+                
+                if (eval(thisReading) === null) {
+                    eval(`${thisReading} = sharedCounter`);
+                    addLog(`執行緒 ${threadNum}: 讀取 counter = ${sharedCounter}`, 'warning');
+                    
+                    const box = document.getElementById(`mutex-t${threadNum}`);
+                    box.classList.add('working');
+                    setTimeout(() => box.classList.remove('working'), 800);
+                    
+                    if (eval(otherReading) !== null && eval(otherReading) === eval(thisReading)) {
+                        addLog(`⚠️ 偵測到 Race Condition！兩個執行緒都讀到相同的值 ${eval(thisReading)}`, 'error');
+                    }
+                    
+                    return;
+                }
+                
+                const readValue = eval(thisReading);
+                const newValue = readValue + 1;
+                
+                const otherReadValue = eval(otherReading);
+                if (otherReadValue !== null && otherReadValue === readValue) {
+                    addLog(`執行緒 ${threadNum}: 寫入 ${readValue} + 1 = ${newValue}`, 'warning');
+                    sharedCounter = newValue;
+                    
+                    const warning = document.getElementById('race-warning');
+                    warning.classList.add('show');
+                    setTimeout(() => warning.classList.remove('show'), 3000);
+                    
+                    addLog(`🚨 Race Condition 發生！執行緒 ${otherThread} 的 +1 被覆蓋了！`, 'error');
+                } else {
+                    addLog(`執行緒 ${threadNum}: 寫入 ${readValue} + 1 = ${newValue}`, 'success');
+                    sharedCounter = newValue;
+                }
+                
+                if (threadNum === 1) {
+                    thread1Count++;
+                    thread1Reading = null;
+                } else {
+                    thread2Count++;
+                    thread2Reading = null;
+                }
+                
+                const box = document.getElementById(`mutex-t${threadNum}`);
+                box.classList.add('working');
+                setTimeout(() => box.classList.remove('working'), 800);
+            }
+            
+            document.getElementById('mutex-counter').textContent = `共享計數器 (Shared Counter): ${sharedCounter}`;
+            updateThreadDisplay(threadNum);
+        }
+
+        function resetMutexDemo() {
+            mutexLocked = false;
+            mutexOwner = null;
+            sharedCounter = 0;
+            thread1Count = 0;
+            thread2Count = 0;
+            thread1Reading = null;
+            thread2Reading = null;
+            
+            document.getElementById('mutex-counter').textContent = `共享計數器 (Shared Counter): 0`;
+            document.getElementById('mutex-log').innerHTML = '';
+            document.getElementById('race-warning').classList.remove('show');
+            
+            updateLockVisual();
+            updateThreadDisplay(1);
+            updateThreadDisplay(2);
+            updateButtons();
+            
+            addLog('系統重置完成', 'success');
+        }
+
+        function startSemaphoreDemo() {
+            if (semRunning) return;
+            
+            semRunning = true;
+            semEventCounter = 0;
+            document.getElementById('sem-event-counter').textContent = `已處理取樣: ${semEventCounter}`;
+            document.getElementById('sem-log').innerHTML = '';
+            document.getElementById('sem-start-btn').disabled = true;
+            document.getElementById('sem-stop-btn').disabled = false;
+            
+            document.getElementById('sem-worker-status').className = 'status-indicator waiting';
+            document.getElementById('sem-worker-status-text').textContent = '等待通知...';
+            
+            addSemLog('sem-log', '⏰ Timer 已啟動');
+            
+            semTimer = setInterval(() => {
+                document.getElementById('sem-isr').className = 'thread-box working';
+                document.getElementById('sem-isr-status').textContent = '🔔 發出通知';
+                addSemLog('sem-log', 'ISR: k_sem_give() - 發出取樣通知');
+                
+                setTimeout(() => {
+                    document.getElementById('sem-isr').className = 'thread-box';
+                    document.getElementById('sem-isr-status').textContent = '等待下次觸發...';
+                }, 200);
+                
+                setTimeout(() => {
+                    document.getElementById('sem-worker').className = 'thread-box working';
+                    document.getElementById('sem-worker-status').className = 'status-indicator active';
+                    document.getElementById('sem-worker-status-text').textContent = '處理中...';
+                    addSemLog('sem-log', '工作執行緒: k_sem_take() 成功，開始處理');
+                    
+                    setTimeout(() => {
+                        semEventCounter++;
+                        document.getElementById('sem-event-counter').textContent = `已處理取樣: ${semEventCounter}`;
+                        document.getElementById('sem-worker').className = 'thread-box';
+                        document.getElementById('sem-worker-status').className = 'status-indicator waiting';
+                        document.getElementById('sem-worker-status-text').textContent = '等待通知...';
+                        addSemLog('sem-log', `處理完成！總計: ${semEventCounter}`);
+                    }, 300);
+                }, 400);
+                
+            }, 1500);
+        }
+
+        function stopSemaphoreDemo() {
+            if (!semRunning) return;
+            
+            semRunning = false;
+            clearInterval(semTimer);
+            document.getElementById('sem-start-btn').disabled = false;
+            document.getElementById('sem-stop-btn').disabled = true;
+            
+            document.getElementById('sem-isr').className = 'thread-box';
+            document.getElementById('sem-isr-status').textContent = '已停止';
+            document.getElementById('sem-worker').className = 'thread-box';
+            document.getElementById('sem-worker-status').className = 'status-indicator idle';
+            document.getElementById('sem-worker-status-text').textContent = '已停止';
+            
+            addSemLog('sem-log', '⏸️ Timer 已停止');
+        }
+
+        function resetSemaphoreDemo() {
+            stopSemaphoreDemo();
+            semEventCounter = 0;
+            document.getElementById('sem-event-counter').textContent = `已處理取樣: 0`;
+            document.getElementById('sem-log').innerHTML = '';
+            document.getElementById('sem-isr-status').textContent = '等待觸發...';
+            document.getElementById('sem-worker-status-text').textContent = '等待通知...';
+        }
+
+        function updatePoolDisplay() {
+            document.getElementById('sem-pool-status').textContent = `可用資源: ${poolAvailable} / ${MAX_RESOURCES}`;
+            
+            const slots = document.querySelectorAll('#sem-slots .sem-slot');
+            slots.forEach((slot, index) => {
+                if (index < MAX_RESOURCES - poolAvailable) {
+                    slot.className = 'sem-slot taken';
+                    slot.textContent = '✖';
+                } else {
+                    slot.className = 'sem-slot available';
+                    slot.textContent = (index + 1).toString();
+                }
+            });
+        }
+
+        function acquireResource() {
+            if (poolAvailable > 0) {
+                poolAvailable--;
+                updatePoolDisplay();
+                addSemLog('pool-log', `✅ k_sem_take() 成功 - 取得資源 (剩餘: ${poolAvailable})`);
+            } else {
+                addSemLog('pool-log', `⚠️ k_sem_take() 等待中 - 無可用資源！`);
+            }
+        }
+
+        function releaseResource() {
+            if (poolAvailable < MAX_RESOURCES) {
+                poolAvailable++;
+                updatePoolDisplay();
+                addSemLog('pool-log', `🔄 k_sem_give() - 釋放資源 (剩餘: ${poolAvailable})`);
+            } else {
+                addSemLog('pool-log', `⚠️ 無法釋放 - 已達最大值！`);
+            }
+        }
+
+        function resetPoolDemo() {
+            poolAvailable = MAX_RESOURCES;
+            updatePoolDisplay();
+            document.getElementById('pool-log').innerHTML = '';
+            addSemLog('pool-log', '🔄 資源池已重置');
+        }
+
+        // Initialize
+        updateButtons();
+        updatePoolDisplay();
+        addLog('系統初始化完成 - 請選擇模式開始體驗！', 'success');
+    </script>
+ <script>(function(){function c(){var b=a.contentDocument||a.contentWindow.document;if(b){var d=b.createElement('script');d.innerHTML="window.__CF$cv$params={r:'9ab3d533458bb307',t:'MTc2NTI3NjI4Ni4wMDAwMDA='};var a=document.createElement('script');a.nonce='';a.src='/cdn-cgi/challenge-platform/scripts/jsd/main.js';document.getElementsByTagName('head')[0].appendChild(a);";b.getElementsByTagName('head')[0].appendChild(d)}}if(document.body){var a=document.createElement('iframe');a.height=1;a.width=1;a.style.position='absolute';a.style.top=0;a.style.left=0;a.style.border='none';a.style.visibility='hidden';document.body.appendChild(a);if('loading'!==document.readyState)c();else if(window.addEventListener)document.addEventListener('DOMContentLoaded',c);else{var e=document.onreadystatechange||function(){};document.onreadystatechange=function(b){e(b);'loading'!==document.readyState&&(document.onreadystatechange=e,c())}}}})();</script></body>
+</html>
