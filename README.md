@@ -26,7 +26,7 @@
 
 
 - GitHub Pages：  
-  `https://catdogbird3.github.io/Thread-Synchronization-Interactive-Lab/`
+  `[https://catdogbird3.github.io/Thread-Synchronization-Interactive-Lab/](https://catdogbird3.github.io/Thread-Synchronization-Interactive-Lab/)`
 
 ---
 
